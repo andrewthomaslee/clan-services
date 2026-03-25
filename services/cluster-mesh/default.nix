@@ -151,6 +151,7 @@
                 name = "mtr-${instanceName}";
                 inherit runtimeInputs;
                 text = ''
+                  # shellcheck disable=SC2046
                   mtr "$@" -br \ ${peers}
                 '';
               })
@@ -158,6 +159,7 @@
                 name = "fping-${instanceName}";
                 inherit runtimeInputs;
                 text = ''
+                  # shellcheck disable=SC2046
                   fping "$@" -a -q -e -c 20 \ ${peers}
                 '';
               })
@@ -165,6 +167,7 @@
                 name = "gping-${instanceName}";
                 inherit runtimeInputs;
                 text = ''
+                  # shellcheck disable=SC2046
                   gping "$@" \ ${peers}
                 '';
               })
@@ -172,6 +175,7 @@
                 name = "trippy-${instanceName}";
                 inherit runtimeInputs;
                 text = ''
+                  # shellcheck disable=SC2046
                   trip "$@" \ ${peers}
                 '';
               })
