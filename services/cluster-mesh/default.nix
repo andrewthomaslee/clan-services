@@ -75,88 +75,109 @@
 
         hostsContent = builtins.concatStringsSep "\n" (extraHostsIPv4 ++ extraHostsIPv6);
       in {
-        # Enable ip forwarding, so wireguard peers can reach eachother
-        boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
-        boot.kernel.sysctl."net.ipv6.ip_forward" = 1;
-
-        networking = {
-          extraHosts = hostsContent;
-          firewall = {
-            allowedUDPPorts = [settings.port];
-            trustedInterfaces = [instanceName];
+        options.cluster-mesh.settings = {
+          endpoint = lib.mkOption {
+            type = lib.types.str;
+            default = settings.endpoint;
+          };
+          port = lib.mkOption {
+            type = lib.types.int;
+            default = settings.port;
+          };
+          ipv4 = lib.mkOption {
+            type = lib.types.str;
+            default = settings.ipv4;
+          };
+          ipv6 = lib.mkOption {
+            type = lib.types.str;
+            default = settings.ipv6;
           };
         };
 
-        networking.wireguard.interfaces."${instanceName}" = {
-          ips = [
-            "${settings.ipv4}/24"
-            "${settings.ipv6}/64"
-          ];
-          listenPort = settings.port;
+        config = {
+          # Enable ip forwarding, so wireguard peers can reach eachother
+          boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
+          boot.kernel.sysctl."net.ipv6.ip_forward" = 1;
 
-          peers = map (peer: {
-            publicKey = (
-              builtins.readFile (
-                config.clan.core.settings.directory
-                + "/vars/per-machine/${peer}/wireguard-${instanceName}/publickey/value"
-              )
-            );
+          networking = {
+            extraHosts = hostsContent;
+            firewall = {
+              allowedUDPPorts = [settings.port];
+              trustedInterfaces = [instanceName];
+            };
+          };
 
-            allowedIPs = [
-              "${roles.peer.machines."${peer}".settings.ipv4}/32"
-              "${roles.peer.machines."${peer}".settings.ipv6}/128"
+          networking.wireguard.interfaces."${instanceName}" = {
+            ips = [
+              "${settings.ipv4}/24"
+              "${settings.ipv6}/64"
             ];
+            listenPort = settings.port;
 
-            endpoint = "${roles.peer.machines."${peer}".settings.endpoint}:${
-              builtins.toString roles.peer.machines."${peer}".settings.port
-            }";
+            peers = map (peer: {
+              publicKey = (
+                builtins.readFile (
+                  config.clan.core.settings.directory
+                  + "/vars/per-machine/${peer}/wireguard-${instanceName}/publickey/value"
+                )
+              );
 
-            persistentKeepalive = 15;
-          }) (lib.attrNames roles.peer.machines);
+              allowedIPs = [
+                "${roles.peer.machines."${peer}".settings.ipv4}/32"
+                "${roles.peer.machines."${peer}".settings.ipv6}/128"
+              ];
+
+              endpoint = "${roles.peer.machines."${peer}".settings.endpoint}:${
+                builtins.toString roles.peer.machines."${peer}".settings.port
+              }";
+
+              persistentKeepalive = 15;
+            }) (lib.attrNames roles.peer.machines);
+          };
+
+          environment.systemPackages = with pkgs; let
+            peers = ''$(grep -oP '\S+\.${instanceName}' /etc/hosts | sort -u)'';
+            runtimeInputs = [
+              mtr
+              fping
+              gping
+              trippy
+              gnugrep
+              coreutils
+            ];
+          in
+            [
+              (writeShellApplication {
+                name = "mtr-${instanceName}";
+                inherit runtimeInputs;
+                text = ''
+                  mtr "$@" -br \ ${peers}
+                '';
+              })
+              (writeShellApplication {
+                name = "fping-${instanceName}";
+                inherit runtimeInputs;
+                text = ''
+                  fping "$@" -a -q -e -c 20 \ ${peers}
+                '';
+              })
+              (writeShellApplication {
+                name = "gping-${instanceName}";
+                inherit runtimeInputs;
+                text = ''
+                  gping "$@" \ ${peers}
+                '';
+              })
+              (writeShellApplication {
+                name = "trippy-${instanceName}";
+                inherit runtimeInputs;
+                text = ''
+                  trip "$@" \ ${peers}
+                '';
+              })
+            ]
+            ++ runtimeInputs;
         };
-
-        environment.systemPackages = with pkgs; let
-          peers = ''$(grep -oP '\S+\.${instanceName}' /etc/hosts | sort -u)'';
-          runtimeInputs = [
-            mtr
-            fping
-            gping
-            trippy
-            gnugrep
-            coreutils
-          ];
-        in
-          [
-            (writeShellApplication {
-              name = "mtr-${instanceName}";
-              inherit runtimeInputs;
-              text = ''
-                mtr "$@" -br \ ${peers}
-              '';
-            })
-            (writeShellApplication {
-              name = "fping-${instanceName}";
-              inherit runtimeInputs;
-              text = ''
-                fping "$@" -a -q -e -c 20 \ ${peers}
-              '';
-            })
-            (writeShellApplication {
-              name = "gping-${instanceName}";
-              inherit runtimeInputs;
-              text = ''
-                gping "$@" \ ${peers}
-              '';
-            })
-            (writeShellApplication {
-              name = "trippy-${instanceName}";
-              inherit runtimeInputs;
-              text = ''
-                trip "$@" \ ${peers}
-              '';
-            })
-          ]
-          ++ runtimeInputs;
       };
     };
   };
@@ -186,8 +207,8 @@
                 wg genkey > $out/privatekey
                 wg pubkey < $out/privatekey > $out/publickey
 
-                printf "${machine.settings.ipv4}" > $out/ipv4
-                printf "${machine.settings.ipv6}" > $out/ipv6
+                printf "${config.cluster-mesh.settings.ipv4}" > $out/ipv4
+                printf "${config.cluster-mesh.settings.ipv6}" > $out/ipv6
               '';
             }
         )
