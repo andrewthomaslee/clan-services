@@ -1,7 +1,8 @@
 {
   lib,
-  # config,
-  # clanLib,
+  config,
+  clanLib,
+  directory,
   ...
 }: {
   _class = "clan.service";

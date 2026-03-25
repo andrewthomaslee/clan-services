@@ -4,7 +4,9 @@
       "inputs": {
         "data-mesher": "data-mesher",
         "disko": "disko",
-        "flake-parts": "flake-parts",
+        "flake-parts": [
+          "flake-parts"
+        ],
         "nix-darwin": "nix-darwin",
         "nix-select": "nix-select",
         "nixpkgs": "nixpkgs",
@@ -13,17 +15,15 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1774382987,
-        "narHash": "sha256-eaLyqSdqnMURHagtF0bQrEBhtn8CCh4pnjzrM3xzWH8=",
-        "owner": "clan-lol",
-        "repo": "clan-core",
-        "rev": "b78c204c4cf30ca96bdb978cce87e1046dd0bc92",
-        "type": "github"
+        "lastModified": 1774433454,
+        "narHash": "sha256-XIFrf3U7BUEd4w1Vebl6jkL084SBCsyOqntPRkFwPsw=",
+        "rev": "0bb77c0d3e75c2ea001b1ef1a238c093a81aa2bd",
+        "type": "tarball",
+        "url": "https://git.clan.lol/api/v1/repos/clan/clan-core/archive/0bb77c0d3e75c2ea001b1ef1a238c093a81aa2bd.tar.gz"
       },
       "original": {
-        "owner": "clan-lol",
-        "repo": "clan-core",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://git.clan.lol/clan/clan-core/archive/main.tar.gz"
       }
     },
     "data-mesher": {
@@ -77,7 +77,6 @@
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
-          "clan-core",
           "nixpkgs"
         ]
       },
@@ -95,23 +94,18 @@
         "type": "github"
       }
     },
-    "flake-parts_2": {
-      "inputs": {
-        "nixpkgs-lib": [
-          "nixpkgs"
-        ]
-      },
+    "import-tree": {
       "locked": {
-        "lastModified": 1772408722,
-        "narHash": "sha256-rHuJtdcOjK7rAHpHphUb1iCvgkU3GpfvicLMwwnfMT0=",
-        "owner": "hercules-ci",
-        "repo": "flake-parts",
-        "rev": "f20dc5d9b8027381c474144ecabc9034d6a839a3",
+        "lastModified": 1773693634,
+        "narHash": "sha256-BtZ2dtkBdSUnFPPFc+n0kcMbgaTxzFNPv2iaO326Ffg=",
+        "owner": "vic",
+        "repo": "import-tree",
+        "rev": "c41e7d58045f9057880b0d85e1152d6a4430dbf1",
         "type": "github"
       },
       "original": {
-        "owner": "hercules-ci",
-        "repo": "flake-parts",
+        "owner": "vic",
+        "repo": "import-tree",
         "type": "github"
       }
     },
@@ -165,7 +159,8 @@
     "root": {
       "inputs": {
         "clan-core": "clan-core",
-        "flake-parts": "flake-parts_2",
+        "flake-parts": "flake-parts",
+        "import-tree": "import-tree",
         "nixpkgs": [
           "clan-core",
           "nixpkgs"
