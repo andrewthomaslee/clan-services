@@ -1,30 +1,14 @@
 {
   lib,
-  config,
-  clanLib,
+  # config,
+  # clanLib,
   ...
 }: {
   _class = "clan.service";
-  manifest.name = "wireguard-fullmesh";
+  manifest.name = "cluster-mesh";
   manifest.description = "WireGuard VPN in a full mesh topology";
   manifest.readme = "WireGuard mesh configuration. All peers connect to all other peers.";
   manifest.categories = ["Networking"];
-  manifest.exports.out = [
-    "networking"
-    "peer"
-  ];
-
-  exports =
-    lib.mapAttrs' (instanceName: _: {
-      name = clanLib.buildScopeKey {
-        inherit instanceName;
-        serviceName = config.manifest.name;
-      };
-      value = {
-        networking.priority = 1500;
-      };
-    })
-    config.instances;
 
   # peer options and configuration
   roles.peer = {
@@ -67,10 +51,11 @@
       roles,
       ...
     }: {
-      nixosModule = {config, ...}: let
-        ipv4 = settings.ipv4;
-        ipv6 = settings.ipv6;
-
+      nixosModule = {
+        config,
+        pkgs,
+        ...
+      }: let
         # extra hosts to add to /etc/hosts
         extraHostsIPv4 =
           lib.mapAttrsToList (
@@ -103,8 +88,8 @@
 
         networking.wireguard.interfaces."${instanceName}" = {
           ips = [
-            "${ipv4}/24"
-            "${ipv6}/64"
+            "${settings.ipv4}/24"
+            "${settings.ipv6}/64"
           ];
           listenPort = settings.port;
 
@@ -128,6 +113,49 @@
             persistentKeepalive = 15;
           }) (lib.attrNames roles.peer.machines);
         };
+
+        environment.systemPackages = with pkgs; let
+          peers = ''$(grep -oP '\S+\.${instanceName}' /etc/hosts | sort -u)'';
+          runtimeInputs = [
+            mtr
+            fping
+            gping
+            trippy
+            gnugrep
+            coreutils
+          ];
+        in
+          [
+            (writeShellApplication {
+              name = "mtr-${instanceName}";
+              inherit runtimeInputs;
+              text = ''
+                mtr "$@" -br \ ${peers}
+              '';
+            })
+            (writeShellApplication {
+              name = "fping-${instanceName}";
+              inherit runtimeInputs;
+              text = ''
+                fping "$@" -a -q -e -c 20 \ ${peers}
+              '';
+            })
+            (writeShellApplication {
+              name = "gping-${instanceName}";
+              inherit runtimeInputs;
+              text = ''
+                gping "$@" \ ${peers}
+              '';
+            })
+            (writeShellApplication {
+              name = "trippy-${instanceName}";
+              inherit runtimeInputs;
+              text = ''
+                trip "$@" \ ${peers}
+              '';
+            })
+          ]
+          ++ runtimeInputs;
       };
     };
   };
@@ -148,12 +176,17 @@
           name: value:
           # Generate keys for each instance of the host
             lib.nameValuePair ("wireguard-" + name) {
+              files.ipv4.secret = false;
+              files.ipv6.secret = false;
               files.publickey.secret = false;
               files.privatekey = {};
               runtimeInputs = with pkgs; [wireguard-tools];
               script = ''
                 wg genkey > $out/privatekey
                 wg pubkey < $out/privatekey > $out/publickey
+
+                printf "${machine.settings.ipv4}" > $out/ipv4
+                printf "${machine.settings.ipv6}" > $out/ipv6
               '';
             }
         )
@@ -165,6 +198,25 @@
           privateKeyFile = "${config.clan.core.vars.generators."wireguard-${name}".files."privatekey".path}";
         })
         instances;
+
+      boot.kernel.sysctl = {
+        # Increase maximum socket buffer sizes to 32MB (for high BDP links)
+        "net.core.rmem_max" = 33554432;
+        "net.core.wmem_max" = 33554432;
+        "net.core.rmem_default" = 1048576;
+        "net.core.wmem_default" = 1048576;
+
+        # Increase TCP buffer limits to 32MB as well
+        "net.ipv4.tcp_rmem" = "4096 1048576 33554432";
+        "net.ipv4.tcp_wmem" = "4096 65536 33554432";
+
+        # Enable TCP BBR for much better high-latency throughput
+        "net.core.default_qdisc" = "fq";
+        "net.ipv4.tcp_congestion_control" = "bbr";
+
+        # Optional: Increase network device backlog for high-speed local links
+        "net.core.netdev_max_backlog" = 16384;
+      };
     };
   };
 }
